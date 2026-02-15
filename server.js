@@ -1,5 +1,6 @@
 const express = require('express');
 const { google } = require('googleapis');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -58,31 +59,27 @@ let sheetsClient;
 async function initializeGoogleSheets() {
   try {
     let auth;
-    
-    try {
+
+    if (fs.existsSync('/etc/secrets/google-credentials.json')) {
       auth = new google.auth.GoogleAuth({
         keyFile: '/etc/secrets/google-credentials.json',
         scopes: ['https://www.googleapis.com/auth/spreadsheets']
       });
       console.log('Using Secret File credentials');
-    } catch (error) {
-      console.log('Secret file not found, trying environment variable...');
-      
-      if (process.env.GOOGLE_CREDENTIALS) {
-        const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-        auth = new google.auth.GoogleAuth({
-          credentials: credentials,
-          scopes: ['https://www.googleapis.com/auth/spreadsheets']
-        });
-        console.log('Using Environment Variable credentials');
-      } else {
-        throw new Error('No Google credentials found');
-      }
+    } else if (process.env.GOOGLE_CREDENTIALS) {
+      const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+      auth = new google.auth.GoogleAuth({
+        credentials: credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+      });
+      console.log('Using Environment Variable credentials');
+    } else {
+      throw new Error('No Google credentials found');
     }
-    
+
     sheetsClient = google.sheets({ version: 'v4', auth });
     console.log('Google Sheets API initialized successfully');
-    
+
   } catch (error) {
     console.error('Google Sheets initialization failed:', error);
   }
