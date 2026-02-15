@@ -326,9 +326,28 @@ async function writeToSheetWithSmartMerge(selectedEmotions, reason) {
 
     console.log('Writing data:', values);
 
-    await sheetsClient.spreadsheets.values.append({
+    // Вставляем новые строки сразу после заголовка (строка 2), чтобы новые записи были вверху
+    const rowCount = values.length;
+    await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: 'A:E',
+      resource: {
+        requests: [{
+          insertDimension: {
+            range: {
+              sheetId: 0,
+              dimension: 'ROWS',
+              startIndex: 1,  // после заголовка (0-indexed)
+              endIndex: 1 + rowCount
+            },
+            inheritFromBefore: false
+          }
+        }]
+      }
+    });
+
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `A2:E${1 + rowCount}`,
       valueInputOption: 'USER_ENTERED',
       resource: {
         values: values
@@ -344,31 +363,30 @@ async function writeToSheetWithSmartMerge(selectedEmotions, reason) {
     
     console.log(`Data written to Google Sheets: ${selectedEmotions.length} emotions`);
     // Вызываем Apps Script для пересчета
-try {
-  const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbxHOXDH7RiUNzq3gV5PyTFBmcvXAbpic7Rt7HYxWuuKT_sf3pMiqXxkT0rTHOBtXjYD-g/exec';
-  
-  const response = await fetch(appsScriptUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      action: 'recalculate',
-      timestamp: new Date().toISOString()
-    })
-  });
-  
-  if (response.ok) {
-    console.log('✅ Apps Script вызван успешно');
-  } else {
-    console.log('⚠️ Apps Script ответил с ошибкой:', response.status);
-  }
-} catch (error) {
-  console.log('❌ Ошибка вызова Apps Script:', error.message);
-}
+    try {
+      const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbxHOXDH7RiUNzq3gV5PyTFBmcvXAbpic7Rt7HYxWuuKT_sf3pMiqXxkT0rTHOBtXjYD-g/exec';
 
-console.log(`Data written to Google Sheets: ${selectedEmotions.length} emotions`);
-return true;
+      const response = await fetch(appsScriptUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'recalculate',
+          timestamp: new Date().toISOString()
+        }),
+        signal: AbortSignal.timeout(30000)
+      });
+
+      if (response.ok) {
+        console.log('✅ Apps Script вызван успешно');
+      } else {
+        console.log('⚠️ Apps Script ответил с ошибкой:', response.status);
+      }
+    } catch (error) {
+      console.log('❌ Ошибка вызова Apps Script:', error.message);
+    }
+
     return true;
     
   } catch (error) {
